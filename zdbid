@@ -1,0 +1,50 @@
+#!/usr/bin/env perl
+#ABSTRACT: Extrahiert aus dem ISIL-Verzeichnis ein Mapping von ISIL zu ZDB-ID
+use v5.14;
+
+use Catmandu::Importer::SRU;
+use Catmandu::Fix::pica_map;
+
+my $isil = shift @ARGV or die "usage: $0 {ISIL}\n";
+my $query = "pica.isi=$isil";
+my $importer = Catmandu::Importer::SRU->new(
+    base         => 'http://sru.gbv.de/isil',
+    query        => $query,
+    recordSchema => 'picaxml'
+);
+
+binmode *STDOUT, 'utf8';
+
+$importer->each(sub {
+
+    # <TODO>: folgender Code sollte nach Catamandu::SRU
+    # bzw. Catmandu::PICA ausgelagert werden
+    my $fields = $_[0]->{recordData}->{record}->[0]->{datafield};
+
+    my $record = {
+        record => [ 
+            map { 
+                my @field = (
+                    $_->{tag},
+                    $_->{occurrence} // ''
+                );
+                my $sf = $_->{subfield};
+                foreach (ref $sf eq 'ARRAY' ? @$sf : $sf) {
+                    push @field, $_->{code};
+                    push @field, $_->{content};
+                }
+                \@field;
+            } @$fields 
+        ]
+    };
+    # </TODO>
+
+    Catmandu::Fix::pica_map->new('008He','isil')->fix($record);
+    Catmandu::Fix::pica_map->new('029Aa','name')->fix($record);
+    Catmandu::Fix::pica_map->new('008Ha','zdbid')->fix($record);
+
+    say join '|', 
+            map { s/\|/ /g; $_; } 
+            map { $record->{$_} } qw(isil name zdbid);
+});
+
