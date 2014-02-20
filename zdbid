@@ -10,16 +10,19 @@ my $query = "pica.isi=$isil";
 my $importer = Catmandu::Importer::SRU->new(
     base         => 'http://sru.gbv.de/isil',
     query        => $query,
-    recordSchema => 'picaxml'
+    recordSchema => 'picaxml',
+    recordTag    => 'record',
 );
 
 binmode *STDOUT, 'utf8';
 
 $importer->each(sub {
+    # https://github.com/LibreCat/Catmandu-SRU/issues/3
+    my $record = ref $_[0] eq 'ARRAY' ? $_[0]->[0] : $_[0];
 
     # <TODO>: folgender Code sollte nach Catamandu::SRU
     # bzw. Catmandu::PICA ausgelagert werden
-    my $fields = $_[0]->{recordData}->{record}->[0]->{datafield};
+    my $fields = $record->{datafield};
 
     my $record = {
         record => [ 
